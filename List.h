@@ -3,14 +3,22 @@
 
     typedef int type_t;
 
+    struct elem
+    {
+        type_t data;
+        int    prev;
+        int    next;
+    };
+
     struct List
     {
-        type_t *data;
-        int    *next;
+        elem   *array;
         int    tail;
         int    head;
+        int    size;
         int    capacity;
         int    status;
+        int    free_head;
     };
 
     /*!
@@ -22,6 +30,13 @@
                 случае
     */
     int listCtor(List *list, int capacity);
+    /*!
+        \brief  Функция уничтожения списка
+        \param  [List *]list Указатель на список
+        \return 0 в случае успехи, 1 в противном
+                случае
+    */
+    int listDtor(List *list);
     /*!
         \brief  Функция поиска свободной 
                 ячейки в списке
@@ -77,7 +92,7 @@
                 корректность
         \param  [List *]list Указатель на список
     */
-    void verifyList(List *list);
+    int verifyList(List *list);
     /*!
         \brief  Функция вывода информации о
                 списке
@@ -85,16 +100,36 @@
         \return 0 в случае успеха, 1 в противном
                 случае
     */
-    void listDump(List *list);
+    void listTextDump(List *list);
+    void listGraphDump(List *list);
+    void printStatus(List *list);
+    void printError(List *list);
 
 
     enum STATUS_AND_ERRS
     {
-        FULL_LIST      = 1 << 0,
-        EMPTY_LIST     = 1 << 1,
+        FULL_LIST          = 1 << 0,
+        EMPTY_LIST         = 1 << 1,
+        EMPTY_ELEM_ERROR   = 1 << 10,
+        DISJOINTED_LIST    = 1 << 11,
     };
 
 
-    #define PRINT_RESHETKA(logs) fprintf(logs, "#################################################################\n");
     #define PRINT_LINE() printf("[%s:%d]\n", __func__, __LINE__);
+
+    #define LIST_DUMP(list)                                                               \
+        verifyList(list);                                                                 \
+        openLogs("LOGS/logs");                                                            \
+        writeLogs("In func -----> %s\n", __func__);                                       \
+        closeLogs();                                                                      \
+        listTextDump(list);                                                               \
+        listGraphDump(list);                                                              
+
+    #define ASSERT_OK(list)                                                               \
+        if (list->status >> 10)                                                           \
+        {                                                                                 \
+            printError(list);                                                             \
+            return list->status;                                                          \
+        }        
+
 #endif
