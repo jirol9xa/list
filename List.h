@@ -5,7 +5,7 @@
 
     struct elem
     {
-        type_t data;
+        type_t value;
         int    prev;
         int    next;
     };
@@ -115,6 +115,16 @@
     void listGraphDump(List *list);
     void printStatus(List *list);
     void printError(List *list);
+    /*!
+        \brief  Функция линеризации списка
+        \param  [List *]list Указатель на список
+        \return 0 в случае успеха, 1 в противном
+                случае
+    */
+    int listLinearization(List *list);
+    int listResize(List *list, int is_upper);
+
+
 
 
     enum STATUS_AND_ERRS
@@ -123,6 +133,7 @@
         EMPTY_LIST         = 1 << 1,
         EMPTY_ELEM_ERROR   = 1 << 10,
         DISJOINTED_LIST    = 1 << 11,
+        NOT_RESIZED        = 1 << 12,
     };
 
 
@@ -132,9 +143,11 @@
         verifyList(list);                                                                 \
         openLogs("LOGS/logs");                                                            \
         writeLogs("In func -----> %s\n", __func__);                                       \
+        printf("XUI\n"); \
         closeLogs();                                                                      \
+        printf("HEY\n"); \
         listTextDump(list);                                                               \
-        listGraphDump(list);                                                              
+        //listGraphDump(list);                                                              
 
     #define ASSERT_OK(list)                                                               \
         if (list->status >> 10)                                                           \

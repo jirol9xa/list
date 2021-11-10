@@ -24,7 +24,6 @@ int openLogs(const char *logs_file_name)
 int closeLogs()
 {
     fclose(logs);
-
     return 0;
 }
 

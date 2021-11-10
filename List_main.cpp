@@ -6,23 +6,26 @@
 int main(void)
 {
     List lst = {};
-    listCtor(&lst, 10);
+    listCtor(&lst, 0);
     type_t mass[20] = {};
     listPushBack(&lst, 4);
+    PRINT_LINE();
+    printf("cap = %d, size = %d\n", lst.capacity, lst.size);
     listPushBack(&lst, 5);
+    PRINT_LINE();
     listPushBack(&lst, 6);
+    PRINT_LINE();
     listPushBack(&lst, 7);
-    listPushBack(&lst, 8);
-    listPushBack(&lst, 9);
-    listInsertBefore(&lst, 24, 5);
-    listInsertAfter(&lst, 25, 5);
+    listInsertBefore(&lst, 24, 3);
+    listInsertAfter(&lst, 25, 2);
     listInsertAfter(&lst, 26, 4);
-    listPopBack(&lst, &(mass[0]));
-    listPopBack(&lst, &(mass[1]));
-    listPopFront(&lst, &(mass[2]));
-    listPopFront(&lst, &(mass[3]));
+    listPopFront(&lst, &(mass[0]));
+    listPopFront(&lst, &(mass[1]));
+    listLinearization(&lst);
 
-    printf("Back = %d\nBack = %d\nFront = %d\nFront = %d\n", mass[0], mass[1], mass[2], mass[3]);
+    printf("Back = %d\nBack = %d\n", mass[0], mass[1]);
+
+    listDtor(&lst);
 
     return 0;
 }

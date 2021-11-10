@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 #include "logsLib.h"
 #include "List.h"
 #include <assert.h>
@@ -13,9 +14,10 @@
 int listCtor(List *list, int capacity)
 {
     assert(list);
-    assert(capacity > 1);
+    assert(capacity >= 0);
 
-    list->capacity = capacity;
+    list->capacity  = capacity + !capacity * 2;
+    list->size      = 1;    //for null element
 
     list->array     = (elem *) calloc(capacity, sizeof(elem));
     list->tail      = 0;
@@ -24,17 +26,16 @@ int listCtor(List *list, int capacity)
 
     list->array[0].prev = 0;
     list->array[0].next = 0;
-    list->array[0].data = 0;
+    list->array[0].value = 0;
     for (int i = 1; i < capacity - 1; i++)
     {
         list->array[i].next = i + 1;
         list->array[i].prev = -1;
     }
-    if (capacity > 1)
-    {
-        list->array[capacity - 1].next = 0;
-        list->array[capacity - 1].prev = -1;
-    }
+    
+    list->array[capacity - 1 + !capacity * 2].next = 0;
+    list->array[capacity - 1 + !capacity * 2].prev = -1;
+    
 
     listGraphDump(list);
     LIST_DUMP(list);
@@ -61,18 +62,19 @@ int listPushBack(List *list, type_t value)
     LIST_DUMP(list);
     ASSERT_OK(list);
 
-    openLogs("LOGS/logs");
-
     if (list->status & FULL_LIST)
     {
-        writeLogs("!!!! ERROR: Can't push in full list !!!! \n");
-        return FULL_LIST;
+        PRINT_LINE();
+        listResize(list, 1);
     }
+    PRINT_LINE();   
+    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
-    
-    list->array[free].data = value;
+    list->size ++;
+    PRINT_LINE();
+    list->array[free].value = value;
     if (list->tail != 0)
     {
         list->array[list->tail].next = free;
@@ -85,8 +87,9 @@ int listPushBack(List *list, type_t value)
         list->head = free;
     }
     list->tail = free;
-
+    PRINT_LINE();
     closeLogs();
+    PRINT_LINE();
     listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
@@ -100,18 +103,18 @@ int listInsertAfter(List* list, type_t value, int place)
     LIST_DUMP(list);
     ASSERT_OK(list);
 
-    openLogs("LOGS/logs");
-
     if (list->status & FULL_LIST)
     {
-        writeLogs("!!!! ERROR: Can't push in full list !!!! \n");
-        return FULL_LIST;
+        listResize(list, 1);
     }
+
+    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
+    list->size ++;
 
-    list->array[free].data  = value;
+    list->array[free].value  = value;
     list->array[free].next  = list->array[place].next;
     list->array[free].prev  = place;
     list->array[list->array[free].next].prev = free;
@@ -139,7 +142,7 @@ int listInsertAfter(List* list, type_t value, int place)
 int verifyList(List *list)
 {   
     assert(list);
-
+    PRINT_LINE();
     list->status = 0;
 
     bool is_full = (list->free_head == 0);
@@ -149,7 +152,7 @@ int verifyList(List *list)
     {
         list->status |= EMPTY_LIST;
     }
-
+    PRINT_LINE();
     for (int i = list->free_head; i != 0;)
     {
         if (list->array[i].prev != -1)
@@ -158,16 +161,21 @@ int verifyList(List *list)
         }
         i = list->array[i].next;
     }
+    PRINT_LINE();
+    printf("free = %d\n", list->array[list->head].next);
     for (int i = list->array[list->head].next; i != 0;)
     {
+        printf("i = %d\n", i);
+
         int prev = list->array[i].prev;
         if (list->array[prev].next != i)
         {
             list->status |= DISJOINTED_LIST;
         }
+        printf("i = %d\n", i);
         i = list->array[i].next;
     }
-
+    PRINT_LINE();
     return 0;
 }
 
@@ -188,7 +196,7 @@ void listTextDump(List *list)
     writeLogs("DATA ");
     for (int i = 0; i < list->capacity; i++)
     {
-        writeLogs(" %3d", list->array[i].data);
+        writeLogs(" %3d", list->array[i].value);
     }
     writeLogs("\n");
     writeLogs("NEXT ");
@@ -209,7 +217,7 @@ void listTextDump(List *list)
     int tail = list->tail;
     while (head != 0)
     {
-        writeLogs(" %3d", list->array[head].data);
+        writeLogs(" %3d", list->array[head].value);
         head = list->array[head].next;
     }
 
@@ -236,14 +244,14 @@ void listGraphDump(List *list)
 
     writeLogs("digraph G{\n    rankdir = LR\n");
 
-    writeLogs("    elem_0[color = blue shape = record, label = \" <ind0> index = 0 | <data0> data = 0 " 
+    writeLogs("    elem_0[color = blue shape = record, label = \" <ind0> index = 0 | <data0> value = 0 " 
                   "| <next0> next = 0 | <prev0> prev = 0 \" ];\n");
 
     for (int i = 1; i < list->capacity; i++)
     {
-        writeLogs("    elem_%d[color = %s shape = record, label = \" <ind%d> index = %d | <data%d>" 
-                  "data = %d | <next%d> next = %d | <prev%d> prev = %d \" ];\n", i, (list->array[i].prev == -1) ? "green" : "red", 
-                  i, i, i, list->array[i].data, i, list->array[i].next, i, list->array[i].prev);
+        writeLogs("    elem_%d[color = %s shape = record, label = \" <ind%d> index = %d | <value%d>" 
+                  "value = %d | <next%d> next = %d | <prev%d> prev = %d \" ];\n", i, (list->array[i].prev == -1) ? "green" : "red", 
+                  i, i, i, list->array[i].value, i, list->array[i].next, i, list->array[i].prev);
         writeLogs("    elem_%d -> elem_%d[style = invis]", i - 1, i);
     }
 
@@ -289,10 +297,16 @@ int listPopBack(List *list, type_t *dest)
         writeLogs("!!!! ERROR: Can't pop empty list !!!! \n");
         return EMPTY_LIST;
     }
+    closeLogs();
+    if (list->capacity > list->size * 2)
+    {
+        listResize(list, 0);
+    }
+    openLogs("LOGS/logs");
 
-    *dest = list->array[list->tail].data;
-    
-    
+
+    memcpy(dest, &(list->array[list->head].value), sizeof(type_t));  
+    list->size --;  
 
     int prev                          = list->array[list->tail].prev;
     list->array[prev].next            = 0;
@@ -325,8 +339,16 @@ int listPopFront(List *list, type_t *dest)
         writeLogs("!!!! ERROR: Can't pop empty list !!!! \n");
         return EMPTY_LIST;
     }
+    closeLogs();
+    if (list->capacity > list->size * 2)
+    {
+        listResize(list, 0);
+    }
 
-    *dest = list->array[list->head].data;
+    openLogs("LOGS/logs");
+
+    memcpy(dest, &(list->array[list->head].value), sizeof(type_t));
+    list->size --;
     
     int next_elem                     = list->array[list->head].next;
     list->array[next_elem].prev       = 0;
@@ -372,7 +394,11 @@ void printError(List *list)
     }
     if (list->status & DISJOINTED_LIST)
     {
-        writeLogs("!!! ERROR LIST IS DISJOINTED!!!\n");
+        writeLogs("!!! ERROR LIST IS DISJOINTED !!!\n");
+    }
+    if (list->status & NOT_RESIZED)
+    {
+        writeLogs("!!! MEMEMOTY WASN'T ALLOCATTED !!!\n");
     }
     closeLogs();
 }
@@ -384,18 +410,18 @@ int listInsertBefore(List* list, type_t value, int place)
     LIST_DUMP(list);
     ASSERT_OK(list);
 
-    openLogs("LOGS/logs");
-
     if (list->status & FULL_LIST)
     {
-        writeLogs("!!!! ERROR: Can't push in full list !!!! \n");
-        return FULL_LIST;
+        listResize(list, 1);
     }
+
+    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
+    list->size ++;
 
-    list->array[free].data                   = value;
+    list->array[free].value                   = value;
     list->array[free].next                   = place;
     list->array[free].prev                   = list->array[place].prev;
     list->array[place].prev                  = free;
@@ -411,5 +437,86 @@ int listInsertBefore(List* list, type_t value, int place)
     LIST_DUMP(list);
     ASSERT_OK(list);
 
+    return 0;
+}
+
+
+int listLinearization(List *list)
+{
+    assert(list);
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    List list_buff = {};
+    listCtor(&list_buff, list->capacity);
+
+    for (int i = list->head; i != 0; )
+    {
+        listPushBack(&list_buff, list->array[i].value);
+
+        i = list->array[i].next;
+    }
+
+    free(list->array);
+
+    memcpy(list, &list_buff, sizeof(List));
+
+    PRINT_LINE();
+    listGraphDump(list);
+
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    PRINT_LINE();
+
+    return 0;    
+}
+
+
+int listResize(List *list, int is_upper)
+{
+    assert(list);
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    if (is_upper)
+    {
+        void *temp_ptr = nullptr;
+        temp_ptr = realloc(list->array, list->capacity * 2);
+        PRINT_LINE();
+        if (!temp_ptr)
+        {
+            openLogs("LOGS/logs");
+            writeLogs("!!! ERROR Can't allocate memory !!!\n");
+            closeLogs();
+            return -1;
+        }
+        list->array = (elem *) temp_ptr;
+        PRINT_LINE();
+        for (int i = list->capacity; i < list->capacity * 2 - 1; i++)
+        {
+            list->array[i].value = 0;
+            list->array[i].next  = i + 1;
+            list->array[i].prev  = -1;
+        }
+        list->array[list->capacity * 2 - 1].value = 0;
+        list->array[list->capacity * 2 - 1].next  = 0;
+        list->array[list->capacity * 2 - 1].prev  = -1;
+
+
+        list->free_head = list->capacity;
+        list->capacity *= 2;
+    }
+    else
+    {
+        listLinearization(list);
+        list->array = (elem *) realloc(list->array, list->capacity / 2);
+        list->capacity /= 2;
+    }
+
+    LIST_DUMP(list);
+    PRINT_LINE();
+    ASSERT_OK(list);
+    PRINT_LINE();
     return 0;
 }
