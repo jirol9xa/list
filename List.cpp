@@ -94,7 +94,7 @@ int listPushBack(List *list, type_t value)
 }
 
 
-int listInsert(List* list, type_t value, int place)
+int listInsertAfter(List* list, type_t value, int place)
 {
     assert(list);
     LIST_DUMP(list);
@@ -129,7 +129,6 @@ int listInsert(List* list, type_t value, int place)
 
     closeLogs();
 
-    listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
 
@@ -248,20 +247,8 @@ void listGraphDump(List *list)
         writeLogs("    elem_%d -> elem_%d[style = invis]", i - 1, i);
     }
 
-    /*if (list->head != 0)
-    {
-        writeLogs("    elem_%d:<next%d> -> elem_0:<prev0>;\n", list->tail, list->tail);
-        //writeLogs("    elem_0:<next0>   -> elem_%d:<prev%d>;\n", list->head, list->head);
-    }*/
-
     writeLogs("    elem_0:<next0> -> elem_0:<prev0>;\n");
     writeLogs("    elem_0:<prev0> -> elem_0:<next0>;\n");
-
-
-    /*if (list->array[list->head].next == list->tail && list->head == 0)   useless, but who knows
-    {
-        writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>;\n", list->head, list->head, list->tail, list->tail);
-    }*/
 
     for (int i = 1; i < list->capacity; i++)
     {
@@ -272,75 +259,10 @@ void listGraphDump(List *list)
         }
         else if (list->array[i].prev != -1)
         {
-            //writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>[constraint = false];\n", 
-              //        list->array[i].prev, list->array[i].prev, i, i);
             writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>[constraint = false, color = red];\n",
                       i, i, list->array[i].next, list->array[i].next);
         }
     }
-
-
-
-
-
-
-
-
-    /*for (int i = list->array[list->head].next; i != 0; )
-    {
-        writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>[constraint = false];\n", list->array[i].prev, list->array[i].prev, i, i);        
-        i = list->array[i].next;
-    }
-
-    for (int i = list->free_head; i != 0; )
-    {
-        if (list->array[i].next != 0)
-        {
-            writeLogs("    elem_%d:<next%d> -> elem_%d:<next%d>[constraint = false];\n", i, i, list->array[i].next, list->array[i].next);
-        }
-        i = list->array[i].next;
-    }*/
-
-
-    // this is the code for placing elements in the logical order
-    /*writeLogs("    elem_0[color = blue shape = record, label = \" <ind0> index = 0 | <data0> data = 0 " 
-                  "| <next0> next = 0 | <prev0> prev = 0 \" ];\n");
-
-    for (int i = list->head; i != list->tail;)
-    {
-        writeLogs("    elem_%d[color = red shape = record, label = \" <ind%d> index = %d | <data%d>" 
-                  "data = %d | <next%d> next = %d | <prev%d> prev = %d \" ];\n", i, i, i, i, list->array[i].data, 
-                  i, list->array[i].next, i, list->array[i].prev);
-        i = list->array[i].next;
-    }
-
-    writeLogs("    elem_%d:<prev%d> -> elem_0:<next0>;\n", list->tail, list->tail);
-
-    for (int i = list->array[list->head].next; i != 0;)
-    {
-        writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>;\n", list->array[i].prev, list->array[i].prev, i, i);
-        writeLogs("    elem_%d:<prev%d> -> elem_%d:<next%d>;\n", list->array[i].next, list->array[i].next, i, i);
-        i = list->array[i].next;
-
-    }
-
-    writeLogs("    elem_%d:<next%d> -> elem_0:<prev0>;\n", list->tail, list->head);
-
-    //dump for non empty elems finished
-
-    for (int i = list->free_head; i != 0;)
-    {
-        writeLogs("    elem_%d[color = green shape = record, label = \" <ind%d> index = %d | <data%d> data = %d " 
-                  "| <next%d> next = %d | <prev%d> prev = %d \" ];\n", i, i, i, i, list->array[i].data, 
-                  i, list->array[i].next, i, list->array[i].prev);
-        i = list->array[i].next;
-    }
-
-    for (int i = list->free_head; i != 0;)
-    {
-        writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>;\n", i, i, list->array[i].next, list->array[i].next);
-        i = list->array[i].next;
-    }*/
 
     writeLogs("}\n");
 
@@ -351,14 +273,6 @@ void listGraphDump(List *list)
 
     FFFFFree("LOGS/GraphLogs.dot");
 }
-
-
-/*void writeElem(List *list)
-{
-    assert(list);
-    char *name = TO_STR(NAME_ELEM(i));
-    writeLogs("    ");
-}*/
 
 
 int listPopBack(List *list, type_t *dest)
@@ -415,7 +329,7 @@ int listPopFront(List *list, type_t *dest)
     *dest = list->array[list->head].data;
     
     int next_elem                     = list->array[list->head].next;
-    list->array[next_elem].prev       = -1;
+    list->array[next_elem].prev       = 0;
     list->array[list->head].next      = list->free_head;
     list->free_head                   = list->head;
     list->array[list->free_head].prev = -1;
@@ -461,4 +375,41 @@ void printError(List *list)
         writeLogs("!!! ERROR LIST IS DISJOINTED!!!\n");
     }
     closeLogs();
+}
+
+
+int listInsertBefore(List* list, type_t value, int place)
+{
+    assert(list);
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    openLogs("LOGS/logs");
+
+    if (list->status & FULL_LIST)
+    {
+        writeLogs("!!!! ERROR: Can't push in full list !!!! \n");
+        return FULL_LIST;
+    }
+
+    int free = list->free_head;
+    list->free_head = list->array[list->free_head].next;
+
+    list->array[free].data                   = value;
+    list->array[free].next                   = place;
+    list->array[free].prev                   = list->array[place].prev;
+    list->array[place].prev                  = free;
+    list->array[list->array[free].prev].next = free;
+
+    if (list->head == place)
+    {
+        list->head = free;
+    }
+
+    closeLogs();
+
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    return 0;
 }

@@ -61,11 +61,22 @@
         \param  [List *]list указатель на список
         \param  [type_t]value Элемент, который
                 нужно добавить
-        \param  [int]place Номер элемента, полсе
+        \param  [int]place Номер элемента, после
                 которого нужно добавить наш
         \return 0 в случае успеха, 1 в противном случае
     */
-    int listInsert(List* list, type_t value, int place);
+    int listInsertAfter(List* list, type_t value, int place);
+    /*!
+        \brief  Функция добавления элемента в 
+                произвольное место списка
+        \param  [List *]list указатель на список
+        \param  [type_t]value Элемент, который
+                нужно добавить
+        \param  [int]place Номер элемента, до
+                которого нужно добавить наш
+        \return 0 в случае успеха, 1 в противном случае
+    */
+    int listInsertBefore(List* list, type_t value, int place);
     /*!
         \brief  Функция извлечения элемента с 
                 конца списка
