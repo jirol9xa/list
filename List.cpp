@@ -152,17 +152,13 @@ int verifyList(List *list)
         }
         i = list->array[i].next;
     }
-    printf("free = %d\n", list->array[list->head].next);
     for (int i = list->array[list->head].next; i != 0;)
     {
-        printf("i = %d\n", i);
-
         int prev = list->array[i].prev;
         if (list->array[prev].next != i)
         {
             list->status |= DISJOINTED_LIST;
         }
-        printf("i = %d\n", i);
         i = list->array[i].next;
     }
     return 0;
@@ -464,7 +460,6 @@ int listResize(List *list, int is_upper)
 
     if (is_upper)
     {
-        PRINT_LINE();
         void *temp_ptr = nullptr;
         temp_ptr = realloc(list->array, list->capacity * 2 * sizeof(elem));
         if (!temp_ptr)
@@ -488,12 +483,10 @@ int listResize(List *list, int is_upper)
 
         list->free_head = list->capacity;
         list->capacity *= 2;
-        PRINT_LINE();
     }
     else
     {
         listLinearization(list);
-        listGraphDump(list);
         list->array = (elem *) realloc(list->array, list->capacity / 2 * sizeof(elem));
         list->capacity /= 2;
 
@@ -501,10 +494,56 @@ int listResize(List *list, int is_upper)
         {
             list->array[list->capacity - 1].next = 0;
         }
-        
-        listGraphDump(list);
-        PRINT_LINE();
+
     }
+
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+    return 0;
+}
+
+
+int listRemove(List *list, int index, type_t *dest)
+{
+    assert(list);
+    assert(dest);
+    LIST_DUMP(list);
+    ASSERT_OK(list);
+
+    if (index > list->capacity)
+    {
+        openLogs("LOGS/logs");
+        writeLogs("!!! ERROR Index is greater than capacity !!!\n");
+        closeLogs();
+        return -1;
+    }
+    if (list->array[index].prev == -1 || index == 0)
+    {
+        openLogs("LOGS/logs");
+        writeLogs("!!! ERROR Can't remove empty element !!!\n");
+        closeLogs();
+        return -1;
+    }
+    if (list->status & EMPTY_LIST)
+    {
+        openLogs("LOGS/logs");
+        writeLogs("!!! ERROR Can't pop empty list !!!\n");
+        closeLogs();
+        return -1;
+    }
+
+    memcpy(dest, &(list->array[index].value), sizeof(type_t));
+    list->size --;
+
+    int next = list->array[index].next;
+    int prev = list->array[index].prev;
+
+    list->array[next].prev  = prev;
+    list->array[prev].next  = next;
+
+    list->array[index].prev = -1;
+    list->array[index].next = list->free_head;
+    list->free_head         = index;
 
     LIST_DUMP(list);
     ASSERT_OK(list);

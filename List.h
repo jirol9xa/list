@@ -123,6 +123,8 @@
     */
     int listLinearization(List *list);
     int listResize(List *list, int is_upper);
+    int listRemove(List *list, int index, type_t *dest);
+
 
 
 
@@ -141,7 +143,6 @@
 
     #define LIST_DUMP(list)                                                               \
         verifyList(list);                                                                 \
-        PRINT_LINE(); \
         openLogs("LOGS/logs");                                                            \
         writeLogs("In func -----> %s\n", __func__);                                       \
         closeLogs();                                                                      \
