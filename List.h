@@ -141,11 +141,10 @@
 
     #define LIST_DUMP(list)                                                               \
         verifyList(list);                                                                 \
+        PRINT_LINE(); \
         openLogs("LOGS/logs");                                                            \
         writeLogs("In func -----> %s\n", __func__);                                       \
-        printf("XUI\n"); \
         closeLogs();                                                                      \
-        printf("HEY\n"); \
         listTextDump(list);                                                               \
         //listGraphDump(list);                                                              
 

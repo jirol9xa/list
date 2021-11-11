@@ -37,7 +37,6 @@ int listCtor(List *list, int capacity)
     list->array[capacity - 1 + !capacity * 2].prev = -1;
     
 
-    listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
 
@@ -64,16 +63,13 @@ int listPushBack(List *list, type_t value)
 
     if (list->status & FULL_LIST)
     {
-        PRINT_LINE();
         listResize(list, 1);
     }
-    PRINT_LINE();   
     openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
     list->size ++;
-    PRINT_LINE();
     list->array[free].value = value;
     if (list->tail != 0)
     {
@@ -87,10 +83,7 @@ int listPushBack(List *list, type_t value)
         list->head = free;
     }
     list->tail = free;
-    PRINT_LINE();
     closeLogs();
-    PRINT_LINE();
-    listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
     return 0;
@@ -142,7 +135,6 @@ int listInsertAfter(List* list, type_t value, int place)
 int verifyList(List *list)
 {   
     assert(list);
-    PRINT_LINE();
     list->status = 0;
 
     bool is_full = (list->free_head == 0);
@@ -152,7 +144,6 @@ int verifyList(List *list)
     {
         list->status |= EMPTY_LIST;
     }
-    PRINT_LINE();
     for (int i = list->free_head; i != 0;)
     {
         if (list->array[i].prev != -1)
@@ -161,7 +152,6 @@ int verifyList(List *list)
         }
         i = list->array[i].next;
     }
-    PRINT_LINE();
     printf("free = %d\n", list->array[list->head].next);
     for (int i = list->array[list->head].next; i != 0;)
     {
@@ -175,7 +165,6 @@ int verifyList(List *list)
         printf("i = %d\n", i);
         i = list->array[i].next;
     }
-    PRINT_LINE();
     return 0;
 }
 
@@ -317,7 +306,6 @@ int listPopBack(List *list, type_t *dest)
 
     closeLogs();
 
-    listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
     return 0;
@@ -359,7 +347,6 @@ int listPopFront(List *list, type_t *dest)
 
     closeLogs();
 
-    listGraphDump(list);
     LIST_DUMP(list);
     ASSERT_OK(list);
     return 0;
@@ -461,13 +448,9 @@ int listLinearization(List *list)
 
     memcpy(list, &list_buff, sizeof(List));
 
-    PRINT_LINE();
-    listGraphDump(list);
-
     LIST_DUMP(list);
     ASSERT_OK(list);
 
-    PRINT_LINE();
 
     return 0;    
 }
@@ -481,9 +464,9 @@ int listResize(List *list, int is_upper)
 
     if (is_upper)
     {
-        void *temp_ptr = nullptr;
-        temp_ptr = realloc(list->array, list->capacity * 2);
         PRINT_LINE();
+        void *temp_ptr = nullptr;
+        temp_ptr = realloc(list->array, list->capacity * 2 * sizeof(elem));
         if (!temp_ptr)
         {
             openLogs("LOGS/logs");
@@ -492,7 +475,6 @@ int listResize(List *list, int is_upper)
             return -1;
         }
         list->array = (elem *) temp_ptr;
-        PRINT_LINE();
         for (int i = list->capacity; i < list->capacity * 2 - 1; i++)
         {
             list->array[i].value = 0;
@@ -506,17 +488,25 @@ int listResize(List *list, int is_upper)
 
         list->free_head = list->capacity;
         list->capacity *= 2;
+        PRINT_LINE();
     }
     else
     {
         listLinearization(list);
-        list->array = (elem *) realloc(list->array, list->capacity / 2);
+        listGraphDump(list);
+        list->array = (elem *) realloc(list->array, list->capacity / 2 * sizeof(elem));
         list->capacity /= 2;
+
+        if (list->array[list->capacity - 1].prev == -1)
+        {
+            list->array[list->capacity - 1].next = 0;
+        }
+        
+        listGraphDump(list);
+        PRINT_LINE();
     }
 
     LIST_DUMP(list);
-    PRINT_LINE();
     ASSERT_OK(list);
-    PRINT_LINE();
     return 0;
 }
