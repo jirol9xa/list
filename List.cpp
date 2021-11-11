@@ -199,7 +199,6 @@ void listTextDump(List *list)
 
     writeLogs("LOGIC");
     int head = list->head;
-    int tail = list->tail;
     while (head != 0)
     {
         writeLogs(" %3d", list->array[head].value);
