@@ -10,6 +10,18 @@
 #define NAME_ELEM(arg) elem_##arg;
 #define TO_STR(arg) #arg;
 
+const int IS_TOO_BIG = 1 << 10;
+
+
+static int compare(const void *first_elem, const void *second_elem);
+static int listLinearizationMem(List *list);
+static int listLinearizationQSORT(List *list);
+static void printStatus(List *list);
+static void printError(List *list);
+
+
+
+
 
 int listCtor(List *list, int capacity)
 {
@@ -19,7 +31,7 @@ int listCtor(List *list, int capacity)
     list->capacity  = capacity + !capacity * 2;
     list->size      = 1;    //for null element
 
-    list->array     = (elem *) calloc(capacity, sizeof(elem));
+    list->array     = (elem_t *) calloc(capacity, sizeof(elem_t));
     list->tail      = 0;
     list->head      = 0;
     list->free_head = 1;
@@ -144,22 +156,20 @@ int verifyList(List *list)
     {
         list->status |= EMPTY_LIST;
     }
-    for (int i = list->free_head; i != 0;)
+    for (int i = list->free_head; i != 0; i = list->array[i].next)
     {
         if (list->array[i].prev != -1)
         {
             list->status |= EMPTY_ELEM_ERROR;
         }
-        i = list->array[i].next;
     }
-    for (int i = list->array[list->head].next; i != 0;)
+    for (int i = list->array[list->head].next; i != 0; i = list->array[i].next)
     {
         int prev = list->array[i].prev;
         if (list->array[prev].next != i)
         {
             list->status |= DISJOINTED_LIST;
         }
-        i = list->array[i].next;
     }
     return 0;
 }
@@ -348,7 +358,7 @@ int listPopFront(List *list, type_t *dest)
 }
 
 
-void printStatus(List *list)
+static void printStatus(List *list)
 {
     assert(list);
 
@@ -367,7 +377,7 @@ void printStatus(List *list)
 }
 
 
-void printError(List *list)
+static void printError(List *list)
 {
     openLogs("LOGS/logs");
     if (list->status & EMPTY_ELEM_ERROR)
@@ -423,7 +433,7 @@ int listInsertBefore(List* list, type_t value, int place)
 }
 
 
-int listLinearization(List *list)
+static int listLinearizationMem(List *list)
 {
     assert(list);
     LIST_DUMP(list);
@@ -432,11 +442,9 @@ int listLinearization(List *list)
     List list_buff = {};
     listCtor(&list_buff, list->capacity);
 
-    for (int i = list->head; i != 0; )
+    for (int i = list->head; i != 0; i = list->array[i].next)
     {
         listPushBack(&list_buff, list->array[i].value);
-
-        i = list->array[i].next;
     }
 
     free(list->array);
@@ -460,7 +468,7 @@ int listResize(List *list, int is_upper)
     if (is_upper)
     {
         void *temp_ptr = nullptr;
-        temp_ptr = realloc(list->array, list->capacity * 2 * sizeof(elem));
+        temp_ptr = realloc(list->array, list->capacity * 2 * sizeof(elem_t));
         if (!temp_ptr)
         {
             openLogs("LOGS/logs");
@@ -468,7 +476,7 @@ int listResize(List *list, int is_upper)
             closeLogs();
             return -1;
         }
-        list->array = (elem *) temp_ptr;
+        list->array = (elem_t *) temp_ptr;
         for (int i = list->capacity; i < list->capacity * 2 - 1; i++)
         {
             list->array[i].value = 0;
@@ -485,8 +493,8 @@ int listResize(List *list, int is_upper)
     }
     else
     {
-        listLinearization(list);
-        list->array = (elem *) realloc(list->array, list->capacity / 2 * sizeof(elem));
+        listLinearizationMem(list);
+        list->array = (elem_t *) realloc(list->array, list->capacity / 2 * sizeof(elem_t));
         list->capacity /= 2;
 
         if (list->array[list->capacity - 1].prev == -1)
@@ -505,7 +513,6 @@ int listResize(List *list, int is_upper)
 int listRemove(List *list, int index, type_t *dest)
 {
     assert(list);
-    assert(dest);
     LIST_DUMP(list);
     ASSERT_OK(list);
 
@@ -543,8 +550,65 @@ int listRemove(List *list, int index, type_t *dest)
     list->array[index].prev = -1;
     list->array[index].next = list->free_head;
     list->free_head         = index;
+    list->array[index].value = 228;
 
     LIST_DUMP(list);
     ASSERT_OK(list);
+    return 0;
+}
+
+
+static int compare(const void *first_elem, const void *second_elem)
+{
+    assert(first_elem);
+    assert(second_elem);
+
+    const elem_t *first  = (const elem_t *) first_elem;
+    const elem_t *second = (const elem_t *) second_elem;
+
+    if (first->prev < second->prev)  return 1;
+    else    return -1; 
+}
+
+
+static int listLinearizationQSORT(List *list)
+{
+    assert(list);
+    PRINT_LINE();
+    qsort(list->array, list->capacity, sizeof(elem_t), compare);
+    for (int i = 1; i < list->capacity; i++)
+    {
+        list->array[i].next = i + 1;
+        if (i < list->size)
+        {
+            list->array[i].prev = i - 1;
+        }
+        else
+        {
+            list->array[i].prev = -1;
+        }
+
+    }
+    list->array[list->capacity - 1].next = 0;
+    list->array[list->size - 1].next     = 0;
+     
+    listGraphDump(list);
+
+    return 0;
+}
+
+
+int listLinearization(List *list)
+{
+    assert(list);
+
+    if (list->capacity >= IS_TOO_BIG)
+    {
+        PRINT_LINE();
+        listLinearizationQSORT(list);
+        return 0;
+    }
+
+    listLinearizationMem(list);
     return 0;
 }

@@ -3,7 +3,7 @@
 
     typedef int type_t;
 
-    struct elem
+    struct elem_t
     {
         type_t value;
         int    prev;
@@ -12,7 +12,7 @@
 
     struct List
     {
-        elem   *array;
+        elem_t   *array;
         int    tail;
         int    head;
         int    size;
@@ -113,8 +113,6 @@
     */
     void listTextDump(List *list);
     void listGraphDump(List *list);
-    void printStatus(List *list);
-    void printError(List *list);
     /*!
         \brief  Функция линеризации списка
         \param  [List *]list Указатель на список
