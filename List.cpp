@@ -7,10 +7,7 @@
 #include <assert.h>
 
 
-#define NAME_ELEM(arg) elem_##arg;
-#define TO_STR(arg) #arg;
-
-const int IS_TOO_BIG = 1 << 10;
+const int IS_TOO_BIG = 1/*1 << 10*/;
 
 
 static int compare(const void *first_elem, const void *second_elem);
@@ -18,9 +15,12 @@ static int listLinearizationMem(List *list);
 static int listLinearizationQSORT(List *list);
 static void printStatus(List *list);
 static void printError(List *list);
+static unsigned int MurmurHash2(char* key, unsigned int len);
+static inline int hashCalc(List *list);
+static int listCMP(List *standart, List *tested, int list_num);
 
 
-
+#define TO_STR(arg) #arg
 
 
 int listCtor(List *list, int capacity)
@@ -137,6 +137,8 @@ int listInsertAfter(List* list, type_t value, int place)
 
     closeLogs();
 
+    list->status &= (~LINEARIZATED);
+
     LIST_DUMP(list);
     ASSERT_OK(list);
 
@@ -171,6 +173,16 @@ int verifyList(List *list)
             list->status |= DISJOINTED_LIST;
         }
     }
+    for (int i = list->head; i < list->size; i++)
+    {
+        if (list->array[i].prev == -1) {
+            list->status &= (~LINEARIZATED);
+            return 0;    
+        }
+    }
+
+    list->status |= LINEARIZATED;
+
     return 0;
 }
 
@@ -426,6 +438,8 @@ int listInsertBefore(List* list, type_t value, int place)
 
     closeLogs();
 
+    list->status &= (~LINEARIZATED);
+
     LIST_DUMP(list);
     ASSERT_OK(list);
 
@@ -544,13 +558,35 @@ int listRemove(List *list, int index, type_t *dest)
     int next = list->array[index].next;
     int prev = list->array[index].prev;
 
+    if (index == list->head)
+    {
+        list->head              = list->array[index].next;
+        list->array[next].prev  = 0;
+        list->array[index].next = list->free_head;
+        list->array[index].prev = -1;
+        list->free_head         = index;
+
+        return 0;
+    }
+    if (index == list->tail)
+    {
+        list->tail              = list->array[index].prev;
+        list->array[prev].next  = 0;
+        list->array[index].prev = -1;
+        list->array[index].next = list->free_head;
+        list->free_head         = index;
+
+        return 0;
+    }
+
     list->array[next].prev  = prev;
     list->array[prev].next  = next;
 
     list->array[index].prev = -1;
     list->array[index].next = list->free_head;
     list->free_head         = index;
-    list->array[index].value = 228;
+
+    list->status &= (~LINEARIZATED);
 
     LIST_DUMP(list);
     ASSERT_OK(list);
@@ -571,11 +607,25 @@ static int compare(const void *first_elem, const void *second_elem)
 }
 
 
+static int compareReverse(const void *first_elem, const void *second_elem)
+{
+    assert(first_elem);
+    assert(second_elem);
+
+    const elem_t *first  = (const elem_t *) first_elem;
+    const elem_t *second = (const elem_t *) second_elem;
+
+    if (first->prev < second->prev)  return -1;
+    else    return 1; 
+}
+
+
 static int listLinearizationQSORT(List *list)
 {
     assert(list);
-    PRINT_LINE();
     qsort(list->array, list->capacity, sizeof(elem_t), compare);
+    qsort(list->array, list->size,     sizeof(elem_t), compareReverse);
+    //listGraphDump(list);
     for (int i = 1; i < list->capacity; i++)
     {
         list->array[i].next = i + 1;
@@ -604,11 +654,147 @@ int listLinearization(List *list)
 
     if (list->capacity >= IS_TOO_BIG)
     {
-        PRINT_LINE();
         listLinearizationQSORT(list);
         return 0;
     }
-
+    
+    list->status |= LINEARIZATED;
     listLinearizationMem(list);
+    return 0;
+}
+
+
+int findPlace(List *list, int index)
+{
+    assert(list);
+    if (index >= list->size || index <= 0) return -1;
+
+    if (list->status & LINEARIZATED)
+    {
+        return list->head + index - 1;
+    }
+    else
+    {
+        int k = 1;
+        for (int i = 1; i < list->size; i++)
+        {
+            if (i == index) return k;
+            k = list->array[k].next;
+        }
+    }
+
+    return -1;
+}
+
+
+static unsigned int MurmurHash2(char* key, unsigned int len) 
+{
+    const unsigned int m = 0x5BD1E995;
+    const unsigned int seed = 0;
+    const int r = 24;
+
+    unsigned int h = seed ^ len;
+
+    const unsigned char* data = (const unsigned char*) key;
+    unsigned int k = 0;
+
+    while (len >= 4) {
+        k  = data[0];
+        k |= data[1] << 8;
+        k |= data[2] << 16;
+        k |= data[3] << 24;
+
+        k *= m;
+        k ^= k >> r;
+        k *= m;
+
+        h *= m;
+        h ^= k;
+
+        data += 4;
+        len -= 4;
+    }
+
+    switch (len) {
+    case 3:
+        h ^= data[2] << 16;
+    case 2:
+        h ^= data[1] << 8;
+    case 1:
+        h ^= data[0];
+        h *= m;
+    };
+    
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+
+    return h;
+}
+
+
+static inline int hashCalc(List *list)
+{
+    return MurmurHash2((char *) list + sizeof(elem_t *), sizeof(List) - sizeof(elem_t *)) + MurmurHash2((char *) list->array, sizeof(elem_t) * list->capacity);
+}
+
+
+int unitTest()
+{
+    List lst = {};
+    listCtor(&lst, 0);
+    List LIST1 = {};
+    listCtor(&LIST1, 1);
+    LIST1.array[0].value = 2;
+    LIST1.array[0].next  = 0;
+    LIST1.array[0].prev  = 0;
+    LIST1.capacity       = 2;
+    LIST1.size           = 1;
+
+    listPushBack(&lst, 2);
+    
+    if (listCMP(&LIST1, &lst, 1))
+    {
+        openLogs("LOGS/logs");
+        writeLogs("UnitTest №1 was failed, programm stopped\n");
+        closeLogs();
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static int listCMP(List *standart, List *tested, int list_num)
+{
+    assert(standart);
+    assert(tested);
+
+    if (standart->capacity != tested->capacity || standart->free_head != tested->free_head
+        || standart->head != tested->head || standart->size != tested->size || standart->status != tested->status
+        || standart->tail != tested->tail)
+    {
+        openLogs("LOGS/logs");
+        writeLogs("!!! ERROR Wrong list parameters in unitTest with list number --- %d!!!\n", list_num);
+        closeLogs();
+        return -1;
+    }
+
+    for (int i = 0; i < standart->capacity; i++)
+    {
+        if (standart->array[i].next != tested->array[i].next || standart->array[i].prev != tested->array[i].prev ||
+            standart->array[i].value != tested->array[i].value)
+        {
+            openLogs("LOGS/logs");
+            writeLogs("!!! ERROR in unitTest with list number -- %d\n", list_num);
+            writeLogs("!!! On place %d located elem:\nprev = %d\nnext = %d\nvalue = %d\n", i, tested->array[i].prev,
+                      tested->array[i].next, tested->array[i].value);
+            writeLogs("!!! But expected:\nprev = %d\nnext = %d\nvalue = %d\n", standart->array[i].prev, standart->array[i].next,
+                      standart->array[i].value);
+            closeLogs();
+            return -1;
+        }
+    }
+
     return 0;
 }

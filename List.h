@@ -122,15 +122,15 @@
     int listLinearization(List *list);
     int listResize(List *list, int is_upper);
     int listRemove(List *list, int index, type_t *dest);
-
-
-
+    int findPlace(List *list, int index);
+    int unitTest();
 
 
     enum STATUS_AND_ERRS
     {
         FULL_LIST          = 1 << 0,
         EMPTY_LIST         = 1 << 1,
+        LINEARIZATED       = 1 << 2,
         EMPTY_ELEM_ERROR   = 1 << 10,
         DISJOINTED_LIST    = 1 << 11,
         NOT_RESIZED        = 1 << 12,
