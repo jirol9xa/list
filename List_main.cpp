@@ -12,15 +12,13 @@ int main(void)
     {
         listPushBack(&lst, i + 1);
     } 
-    listRemove(&lst, 5, &(mass[0]));   
-    listGraphDump(&lst);
+    //listRemove(&lst, 5, &(mass[0]));   
+    /*listGraphDump(&lst);
     listLinearization(&lst);    
     listGraphDump(&lst);
     printf("%d\n", findPlace(&lst, 3));
     listGraphDump(&lst);
     listDtor(&lst);
-
-    unitTest();
-
+    PRINT_LINE();*/
     return 0;
 }

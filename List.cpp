@@ -7,7 +7,7 @@
 #include <assert.h>
 
 
-const int IS_TOO_BIG = 1/*1 << 10*/;
+const int THRESHOLD_OF_LIN = 1 << 10; //threshold_of_lin
 
 
 static int compare(const void *first_elem, const void *second_elem);
@@ -16,7 +16,9 @@ static int listLinearizationQSORT(List *list);
 static void printStatus(List *list);
 static void printError(List *list);
 static unsigned int MurmurHash2(char* key, unsigned int len);
-static inline int hashCalc(List *list);
+static unsigned int hashCalc(List *list);
+
+
 static int listCMP(List *standart, List *tested, int list_num);
 
 
@@ -28,10 +30,10 @@ int listCtor(List *list, int capacity)
     assert(list);
     assert(capacity >= 0);
 
-    list->capacity  = capacity + !capacity * 2;
+    list->capacity  = capacity + !capacity * 2 + 1;
     list->size      = 1;    //for null element
 
-    list->array     = (elem_t *) calloc(capacity, sizeof(elem_t));
+    list->array     = (elem_t *) calloc(list->capacity, sizeof(elem_t));
     list->tail      = 0;
     list->head      = 0;
     list->free_head = 1;
@@ -47,7 +49,6 @@ int listCtor(List *list, int capacity)
     
     list->array[capacity - 1 + !capacity * 2].next = 0;
     list->array[capacity - 1 + !capacity * 2].prev = -1;
-    
 
     LIST_DUMP(list);
     ASSERT_OK(list);
@@ -163,6 +164,7 @@ int verifyList(List *list)
         if (list->array[i].prev != -1)
         {
             list->status |= EMPTY_ELEM_ERROR;
+            break;
         }
     }
     for (int i = list->array[list->head].next; i != 0; i = list->array[i].next)
@@ -171,6 +173,7 @@ int verifyList(List *list)
         if (list->array[prev].next != i)
         {
             list->status |= DISJOINTED_LIST;
+            break;
         }
     }
     for (int i = list->head; i < list->size; i++)
@@ -282,8 +285,8 @@ void listGraphDump(List *list)
 
     closeLogs();
 
-    system("dot -T png LOGS/GraphLogs.dot -o pic.png");
-    system("eog pic.png");
+    //system("dot -T png LOGS/GraphLogs.dot -o pic.png");
+    //system("eog pic.png");
 
     FFFFFree("LOGS/GraphLogs.dot");
 }
@@ -374,6 +377,7 @@ static void printStatus(List *list)
 {
     assert(list);
 
+    openLogs("LOGS/logs");
     if (list->status & FULL_LIST)
     {
         writeLogs("LIST IS FULL\n");
@@ -386,6 +390,7 @@ static void printStatus(List *list)
     {
         writeLogs("!!! ERROR LIST IS DISJOINTED!!!\n");
     }
+    closeLogs();
 }
 
 
@@ -601,31 +606,20 @@ static int compare(const void *first_elem, const void *second_elem)
 
     const elem_t *first  = (const elem_t *) first_elem;
     const elem_t *second = (const elem_t *) second_elem;
+    size_t idx1 = first->prev;
+    size_t idx2 = second->prev;
 
-    if (first->prev < second->prev)  return 1;
+
+    if (idx1 > idx2)  return 1;
     else    return -1; 
-}
-
-
-static int compareReverse(const void *first_elem, const void *second_elem)
-{
-    assert(first_elem);
-    assert(second_elem);
-
-    const elem_t *first  = (const elem_t *) first_elem;
-    const elem_t *second = (const elem_t *) second_elem;
-
-    if (first->prev < second->prev)  return -1;
-    else    return 1; 
 }
 
 
 static int listLinearizationQSORT(List *list)
 {
     assert(list);
-    qsort(list->array, list->capacity, sizeof(elem_t), compare);
-    qsort(list->array, list->size,     sizeof(elem_t), compareReverse);
-    //listGraphDump(list);
+    qsort(list->array + sizeof(elem_t), list->capacity - 1, sizeof(elem_t), compare);
+    listGraphDump(list);
     for (int i = 1; i < list->capacity; i++)
     {
         list->array[i].next = i + 1;
@@ -652,9 +646,10 @@ int listLinearization(List *list)
 {
     assert(list);
 
-    if (list->capacity >= IS_TOO_BIG)
+    if (list->capacity >= THRESHOLD_OF_LIN)
     {
         listLinearizationQSORT(list);
+        list->status |= LINEARIZATED;
         return 0;
     }
     
@@ -673,14 +668,12 @@ int findPlace(List *list, int index)
     {
         return list->head + index - 1;
     }
-    else
+
+    int k = 1;
+    for (int i = 1; i < list->size; i++)
     {
-        int k = 1;
-        for (int i = 1; i < list->size; i++)
-        {
-            if (i == index) return k;
-            k = list->array[k].next;
-        }
+        if (i == index) return k;
+        k = list->array[k].next;
     }
 
     return -1;
@@ -733,11 +726,13 @@ static unsigned int MurmurHash2(char* key, unsigned int len)
 }
 
 
-static inline int hashCalc(List *list)
-{
-    return MurmurHash2((char *) list + sizeof(elem_t *), sizeof(List) - sizeof(elem_t *)) + MurmurHash2((char *) list->array, sizeof(elem_t) * list->capacity);
+static unsigned int hashCalc(List *list)
+{ 
+    //rall ----- >hash_2 ^ (hash_1 >> 31 | hash_2 << 1)
+    unsigned int hash_1 = MurmurHash2((char *) list + sizeof(elem_t *), sizeof(List) - sizeof(elem_t *));
+    unsigned int hash_2 = MurmurHash2((char *) list->array, sizeof(elem_t) * list->capacity);
+    return hash_2 ^ (hash_1 >> (sizeof(unsigned int) - 1) | hash_2 << 1);
 }
-
 
 int unitTest()
 {
@@ -758,8 +753,14 @@ int unitTest()
         openLogs("LOGS/logs");
         writeLogs("UnitTest №1 was failed, programm stopped\n");
         closeLogs();
+        listDtor(&lst);
+        listDtor(&LIST1);
         return -1;
     }
+
+
+    listDtor(&lst);
+    listDtor(&LIST1);
 
     return 0;
 }
