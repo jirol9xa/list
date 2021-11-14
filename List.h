@@ -151,6 +151,9 @@
         if (list->status >> 10)                                                           \
         {                                                                                 \
             return list->status;                                                          \
-        }        
+        }      
+
+
+    const int POISON = -1;
 
 #endif

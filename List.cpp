@@ -60,11 +60,24 @@ int listCtor(List *list, int capacity)
 int listDtor(List *list)
 {
     assert(list);
+    
+    if (list->capacity == POISON || list->free_head == POISON || list->head == POISON
+        || list->size  == POISON || list->status    == POISON || list->tail == POISON)
+    {
+        writeLogs("!!! ERROR List is already cleaned !!!\n");
+        return -1;
+    }
 
     listDUMP(list, __func__);
     ASSERT_OK(list);
 
     free(list->array);
+    list->capacity  = POISON;
+    list->free_head = POISON;
+    list->head      = POISON;
+    list->size      = POISON;
+    list->status    = POISON;
+    list->tail      = POISON;
     return 0;
 }
 

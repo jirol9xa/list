@@ -30,6 +30,7 @@ int main(void)
 
 
     listDtor(&lst);
+    listDtor(&lst);
     closeLogs();
     return 0;
 }
