@@ -139,18 +139,17 @@
 
     #define PRINT_LINE() printf("[%s:%d]\n", __func__, __LINE__);
 
-    #define LIST_DUMP(list)                                                               \
+    /*#define LIST_DUMP(list)                                                               \
         verifyList(list);                                                                 \
         openLogs("LOGS/logs");                                                            \
         writeLogs("In func -----> %s\n", __func__);                                       \
         closeLogs();                                                                      \
         listTextDump(list);                                                               \
-        //listGraphDump(list);                                                              
+        //listGraphDump(list);         */                                                     
 
     #define ASSERT_OK(list)                                                               \
         if (list->status >> 10)                                                           \
         {                                                                                 \
-            printError(list);                                                             \
             return list->status;                                                          \
         }        
 

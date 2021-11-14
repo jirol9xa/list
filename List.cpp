@@ -7,16 +7,16 @@
 #include <assert.h>
 
 
-const int THRESHOLD_OF_LIN = 1 << 10; //threshold_of_lin
+const int THRESHOLD_OF_LIN = 1 << 10; //is upper lin will be qsort
 
 
 static int compare(const void *first_elem, const void *second_elem);
 static int listLinearizationMem(List *list);
 static int listLinearizationQSORT(List *list);
 static void printStatus(List *list);
-static void printError(List *list);
 static unsigned int MurmurHash2(char* key, unsigned int len);
 static unsigned int hashCalc(List *list);
+void listDUMP(List *list, const char* func_name);
 
 
 static int listCMP(List *standart, List *tested, int list_num);
@@ -30,7 +30,7 @@ int listCtor(List *list, int capacity)
     assert(list);
     assert(capacity >= 0);
 
-    list->capacity  = capacity + !capacity * 2 + 1;
+    list->capacity  = capacity + !capacity * 2 + (capacity == 1);
     list->size      = 1;    //for null element
 
     list->array     = (elem_t *) calloc(list->capacity, sizeof(elem_t));
@@ -41,16 +41,16 @@ int listCtor(List *list, int capacity)
     list->array[0].prev = 0;
     list->array[0].next = 0;
     list->array[0].value = 0;
-    for (int i = 1; i < capacity - 1; i++)
+    for (int i = list->free_head; i < list->capacity - 1; i++)
     {
         list->array[i].next = i + 1;
         list->array[i].prev = -1;
     }
     
-    list->array[capacity - 1 + !capacity * 2].next = 0;
-    list->array[capacity - 1 + !capacity * 2].prev = -1;
+    list->array[list->capacity - 1].next = 0;
+    list->array[list->capacity - 1].prev = -1;
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     return 0;
@@ -60,7 +60,7 @@ int listCtor(List *list, int capacity)
 int listDtor(List *list)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     free(list->array);
@@ -71,14 +71,13 @@ int listDtor(List *list)
 int listPushBack(List *list, type_t value)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     if (list->status & FULL_LIST)
     {
         listResize(list, 1);
     }
-    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
@@ -96,8 +95,8 @@ int listPushBack(List *list, type_t value)
         list->head = free;
     }
     list->tail = free;
-    closeLogs();
-    LIST_DUMP(list);
+
+    listDUMP(list, __func__);
     ASSERT_OK(list);
     return 0;
 }
@@ -106,15 +105,13 @@ int listPushBack(List *list, type_t value)
 int listInsertAfter(List* list, type_t value, int place)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     if (list->status & FULL_LIST)
     {
         listResize(list, 1);
     }
-
-    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
@@ -136,11 +133,9 @@ int listInsertAfter(List* list, type_t value, int place)
         list->tail = free;
     }
 
-    closeLogs();
-
     list->status &= (~LINEARIZATED);
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     return 0;
@@ -150,9 +145,10 @@ int listInsertAfter(List* list, type_t value, int place)
 int verifyList(List *list)
 {   
     assert(list);
-    list->status = 0;
 
-    bool is_full = (list->free_head == 0);
+    list->status = 0;
+    
+    bool is_full = list->free_head == 0;
     list->status |= is_full;
 
     if (list->tail == 0)
@@ -193,8 +189,6 @@ int verifyList(List *list)
 void listTextDump(List *list)
 {
     assert(list);
-
-    openLogs("LOGS/logs");
 
     printReshetka();
     writeLogs("PLACE");
@@ -238,8 +232,7 @@ void listTextDump(List *list)
     printStatus(list);
     printReshetka();
     writeLogs("\n");
-
-    closeLogs();
+    
 }
 
 
@@ -247,48 +240,44 @@ void listGraphDump(List *list)
 {
     assert(list);
 
-    FFFFFree("LOGS/GraphLogs.dot");
+    FILE *graph_logs = fopen("LOGS/GraphLogs.dot", "w");
 
-    openLogs("LOGS/GraphLogs.dot");
+    fprintf(graph_logs, "digraph G{\n    rankdir = LR\n");
 
-    writeLogs("digraph G{\n    rankdir = LR\n");
-
-    writeLogs("    elem_0[color = blue shape = record, label = \" <ind0> index = 0 | <data0> value = 0 " 
+    fprintf(graph_logs, "    elem_0[color = blue shape = record, label = \" <ind0> index = 0 | <data0> value = 0 " 
                   "| <next0> next = 0 | <prev0> prev = 0 \" ];\n");
 
     for (int i = 1; i < list->capacity; i++)
     {
-        writeLogs("    elem_%d[color = %s shape = record, label = \" <ind%d> index = %d | <value%d>" 
+        fprintf(graph_logs, "    elem_%d[color = %s shape = record, label = \" <ind%d> index = %d | <value%d>" 
                   "value = %d | <next%d> next = %d | <prev%d> prev = %d \" ];\n", i, (list->array[i].prev == -1) ? "green" : "red", 
                   i, i, i, list->array[i].value, i, list->array[i].next, i, list->array[i].prev);
-        writeLogs("    elem_%d -> elem_%d[style = invis]", i - 1, i);
+        fprintf(graph_logs, "    elem_%d -> elem_%d[style = invis]", i - 1, i);
     }
 
-    writeLogs("    elem_0:<next0> -> elem_0:<prev0>;\n");
-    writeLogs("    elem_0:<prev0> -> elem_0:<next0>;\n");
+    fprintf(graph_logs, "    elem_0:<next0> -> elem_0:<prev0>;\n");
+    fprintf(graph_logs, "    elem_0:<prev0> -> elem_0:<next0>;\n");
 
     for (int i = 1; i < list->capacity; i++)
     {
         if (list->array[i].prev == -1 && list->array[i].next != 0)
         {
-            writeLogs("    elem_%d:<next%d> -> elem_%d:<next%d>[constraint = false, color = green];\n", 
+            fprintf(graph_logs, "    elem_%d:<next%d> -> elem_%d:<next%d>[constraint = false, color = green];\n", 
                       i, i, list->array[i].next, list->array[i].next);
         }
         else if (list->array[i].prev != -1)
         {
-            writeLogs("    elem_%d:<next%d> -> elem_%d:<prev%d>[constraint = false, color = red];\n",
+            fprintf(graph_logs, "    elem_%d:<next%d> -> elem_%d:<prev%d>[constraint = false, color = red];\n",
                       i, i, list->array[i].next, list->array[i].next);
         }
     }
 
-    writeLogs("}\n");
+    fprintf(graph_logs, "}\n");
 
-    closeLogs();
+    fclose(graph_logs);
 
-    //system("dot -T png LOGS/GraphLogs.dot -o pic.png");
-    //system("eog pic.png");
-
-    FFFFFree("LOGS/GraphLogs.dot");
+    system("dot -T png LOGS/GraphLogs.dot -o pic.png");
+    system("eog pic.png");
 }
 
 
@@ -296,25 +285,21 @@ int listPopBack(List *list, type_t *dest)
 {
     assert(list);
     assert(dest);
-    LIST_DUMP(list);
-    ASSERT_OK(list);
-
-    openLogs("LOGS/logs");
+    listDUMP(list, __func__);
+    ASSERT_OK(list);    
 
     if (list->status & EMPTY_LIST)
     {
         writeLogs("!!!! ERROR: Can't pop empty list !!!! \n");
         return EMPTY_LIST;
     }
-    closeLogs();
+    
     if (list->capacity > list->size * 2)
     {
         listResize(list, 0);
     }
-    openLogs("LOGS/logs");
-
-
-    memcpy(dest, &(list->array[list->head].value), sizeof(type_t));  
+    
+    memcpy(dest, &(list->array[list->tail].value), sizeof(type_t));  
     list->size --;  
 
     int prev                          = list->array[list->tail].prev;
@@ -324,9 +309,9 @@ int listPopBack(List *list, type_t *dest)
     list->free_head                   = list->tail;
     list->tail                        = prev;
 
-    closeLogs();
+    
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
     return 0;
 }
@@ -336,10 +321,8 @@ int listPopFront(List *list, type_t *dest)
 {
     assert(list);
     assert(dest);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
-
-    openLogs("LOGS/logs");
 
     verifyList(list);
     if (list->status & EMPTY_LIST)
@@ -347,13 +330,11 @@ int listPopFront(List *list, type_t *dest)
         writeLogs("!!!! ERROR: Can't pop empty list !!!! \n");
         return EMPTY_LIST;
     }
-    closeLogs();
+    
     if (list->capacity > list->size * 2)
     {
         listResize(list, 0);
     }
-
-    openLogs("LOGS/logs");
 
     memcpy(dest, &(list->array[list->head].value), sizeof(type_t));
     list->size --;
@@ -365,9 +346,7 @@ int listPopFront(List *list, type_t *dest)
     list->array[list->free_head].prev = -1;
     list->head                        = next_elem;
 
-    closeLogs();
-
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
     return 0;
 }
@@ -377,54 +356,41 @@ static void printStatus(List *list)
 {
     assert(list);
 
-    openLogs("LOGS/logs");
     if (list->status & FULL_LIST)
     {
-        writeLogs("LIST IS FULL\n");
+        writeLogs("LIST IS FULL ");
     }
     if (list->status & EMPTY_LIST)
     {
-        writeLogs("LIST IS EMPTY\n");
+        writeLogs("LIST IS EMPTY ");
+    }
+    if (list->status & LINEARIZATED)
+    {
+        writeLogs("LIST IS LINEARIZATED ");
     }
     if (list->status & DISJOINTED_LIST)
     {
         writeLogs("!!! ERROR LIST IS DISJOINTED!!!\n");
     }
-    closeLogs();
-}
-
-
-static void printError(List *list)
-{
-    openLogs("LOGS/logs");
-    if (list->status & EMPTY_ELEM_ERROR)
-    {
-        writeLogs("!!! ERR THE PREVIOUS ELEMENT FOR AN EMPTY ONE IS NOT EQUAL TO -1 !!!");
-    }
-    if (list->status & DISJOINTED_LIST)
-    {
-        writeLogs("!!! ERROR LIST IS DISJOINTED !!!\n");
-    }
     if (list->status & NOT_RESIZED)
     {
-        writeLogs("!!! MEMEMOTY WASN'T ALLOCATTED !!!\n");
+        writeLogs("!!! ERROR LIST IS NOT RESIZED!!!\n");
     }
-    closeLogs();
+
+    writeLogs("\n");
 }
 
 
 int listInsertBefore(List* list, type_t value, int place)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     if (list->status & FULL_LIST)
     {
         listResize(list, 1);
     }
-
-    openLogs("LOGS/logs");
 
     int free = list->free_head;
     list->free_head = list->array[list->free_head].next;
@@ -441,11 +407,9 @@ int listInsertBefore(List* list, type_t value, int place)
         list->head = free;
     }
 
-    closeLogs();
-
     list->status &= (~LINEARIZATED);
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     return 0;
@@ -455,7 +419,7 @@ int listInsertBefore(List* list, type_t value, int place)
 static int listLinearizationMem(List *list)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     List list_buff = {};
@@ -470,9 +434,8 @@ static int listLinearizationMem(List *list)
 
     memcpy(list, &list_buff, sizeof(List));
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
-
 
     return 0;    
 }
@@ -481,18 +444,19 @@ static int listLinearizationMem(List *list)
 int listResize(List *list, int is_upper)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     if (is_upper)
     {
         void *temp_ptr = nullptr;
         temp_ptr = realloc(list->array, list->capacity * 2 * sizeof(elem_t));
+
         if (!temp_ptr)
         {
-            openLogs("LOGS/logs");
+            
             writeLogs("!!! ERROR Can't allocate memory !!!\n");
-            closeLogs();
+            
             return -1;
         }
         list->array = (elem_t *) temp_ptr;
@@ -523,7 +487,7 @@ int listResize(List *list, int is_upper)
 
     }
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
     return 0;
 }
@@ -532,28 +496,28 @@ int listResize(List *list, int is_upper)
 int listRemove(List *list, int index, type_t *dest)
 {
     assert(list);
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
 
     if (index > list->capacity)
     {
-        openLogs("LOGS/logs");
+        
         writeLogs("!!! ERROR Index is greater than capacity !!!\n");
-        closeLogs();
+        
         return -1;
     }
     if (list->array[index].prev == -1 || index == 0)
     {
-        openLogs("LOGS/logs");
+        
         writeLogs("!!! ERROR Can't remove empty element !!!\n");
-        closeLogs();
+        
         return -1;
     }
     if (list->status & EMPTY_LIST)
     {
-        openLogs("LOGS/logs");
+        
         writeLogs("!!! ERROR Can't pop empty list !!!\n");
-        closeLogs();
+        
         return -1;
     }
 
@@ -593,7 +557,7 @@ int listRemove(List *list, int index, type_t *dest)
 
     list->status &= (~LINEARIZATED);
 
-    LIST_DUMP(list);
+    listDUMP(list, __func__);
     ASSERT_OK(list);
     return 0;
 }
@@ -609,7 +573,6 @@ static int compare(const void *first_elem, const void *second_elem)
     size_t idx1 = first->prev;
     size_t idx2 = second->prev;
 
-
     if (idx1 > idx2)  return 1;
     else    return -1; 
 }
@@ -618,7 +581,7 @@ static int compare(const void *first_elem, const void *second_elem)
 static int listLinearizationQSORT(List *list)
 {
     assert(list);
-    qsort(list->array + sizeof(elem_t), list->capacity - 1, sizeof(elem_t), compare);
+    qsort(list->array, list->capacity - 1, sizeof(elem_t), compare);
     listGraphDump(list);
     for (int i = 1; i < list->capacity; i++)
     {
@@ -740,28 +703,53 @@ int unitTest()
     listCtor(&lst, 0);
     List LIST1 = {};
     listCtor(&LIST1, 1);
-    LIST1.array[0].value = 2;
-    LIST1.array[0].next  = 0;
-    LIST1.array[0].prev  = 0;
+    LIST1.array[1].value = 2;
+    LIST1.array[1].next  = 0;
+    LIST1.array[1].prev  = 0;
     LIST1.capacity       = 2;
-    LIST1.size           = 1;
+    LIST1.size           = 2;
+    LIST1.status         = (FULL_LIST + LINEARIZATED);
+    LIST1.free_head      = 0;
+    LIST1.head           = 1;
+    LIST1.tail           = 1;
+    
+    listGraphDump(&LIST1);
 
     listPushBack(&lst, 2);
-    
+
     if (listCMP(&LIST1, &lst, 1))
     {
-        openLogs("LOGS/logs");
+        
         writeLogs("UnitTest №1 was failed, programm stopped\n");
-        closeLogs();
+        
         listDtor(&lst);
         listDtor(&LIST1);
         return -1;
     }
 
-
     listDtor(&lst);
     listDtor(&LIST1);
 
+    List list = {};
+    listCtor(&list, 0);
+    for (int i = 1; i < 10; i++)
+    {
+        listPushBack(&list, i);
+    }
+    for (int i = 9  ; i >= 1; i--)
+    {
+        type_t last = {};
+        listPopBack(&list, &last);
+        if (last != i)
+        {
+            writeLogs("!!! UnitTest was failed !!!\nElem on %d position in list is %d, ", i, last);
+            writeLogs("but exepcet %d.\nProgramm finished!!!\n", i);
+            listDtor(&list);
+            return -1;
+        }
+    }
+
+    listDtor(&list);
     return 0;
 }
 
@@ -775,9 +763,9 @@ static int listCMP(List *standart, List *tested, int list_num)
         || standart->head != tested->head || standart->size != tested->size || standart->status != tested->status
         || standart->tail != tested->tail)
     {
-        openLogs("LOGS/logs");
+        
         writeLogs("!!! ERROR Wrong list parameters in unitTest with list number --- %d!!!\n", list_num);
-        closeLogs();
+        
         return -1;
     }
 
@@ -786,16 +774,28 @@ static int listCMP(List *standart, List *tested, int list_num)
         if (standart->array[i].next != tested->array[i].next || standart->array[i].prev != tested->array[i].prev ||
             standart->array[i].value != tested->array[i].value)
         {
-            openLogs("LOGS/logs");
+            
             writeLogs("!!! ERROR in unitTest with list number -- %d\n", list_num);
             writeLogs("!!! On place %d located elem:\nprev = %d\nnext = %d\nvalue = %d\n", i, tested->array[i].prev,
                       tested->array[i].next, tested->array[i].value);
             writeLogs("!!! But expected:\nprev = %d\nnext = %d\nvalue = %d\n", standart->array[i].prev, standart->array[i].next,
                       standart->array[i].value);
-            closeLogs();
+            
             return -1;
         }
     }
 
     return 0;
+}
+
+
+void listDUMP(List *list, const char *func_name)
+{
+    assert(list);
+
+                                                                
+    writeLogs("In func -----> %s\n", func_name);                                       
+                                                                          
+    verifyList(list);
+    listTextDump(list);
 }
