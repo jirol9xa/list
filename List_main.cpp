@@ -14,7 +14,7 @@ int main(void)
     {
         printf("Ops... something wrong\n");
         return 0;
-    }    
+    }
 
     for (int i = 0; i < 10; i++)
     {
@@ -26,7 +26,7 @@ int main(void)
     listGraphDump(&lst);
     printf("%d\n", findPlace(&lst, 3));
     listGraphDump(&lst);
-
+    
 
 
     listDtor(&lst);

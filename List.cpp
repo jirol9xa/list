@@ -60,6 +60,7 @@ int listCtor(List *list, int capacity)
 int listDtor(List *list)
 {
     assert(list);
+
     listDUMP(list, __func__);
     ASSERT_OK(list);
 
@@ -226,7 +227,7 @@ void listTextDump(List *list)
 
     writeLogs("\n");
 
-    writeLogs("   HEAD = %d\n   TAIL = %d\n\n", list->head, list->tail);
+    writeLogs("   HEAD = %d\n   TAIL = %d\n   CAPACITY = %d\n   SIZE = %d\n\n", list->head, list->tail, list->capacity, list->size);
 
     writeLogs("list status = %d\nfree_head = %d\n", list->status, list->free_head);
     printStatus(list);
@@ -302,14 +303,25 @@ int listPopBack(List *list, type_t *dest)
     memcpy(dest, &(list->array[list->tail].value), sizeof(type_t));  
     list->size --;  
 
+    if (list->head == list->tail)
+    {
+        list->array[list->tail].prev = -1;
+        list->array[list->tail].next = list->free_head;
+        list->free_head              = list->head;
+        list->head                   = 0;
+        list->tail                   = 0;
+
+        listDUMP(list, __func__);
+        ASSERT_OK(list);
+        return 0;
+    }
+
     int prev                          = list->array[list->tail].prev;
     list->array[prev].next            = 0;
     list->array[list->tail].prev      = -1;
     list->array[list->tail].next      = list->free_head;
     list->free_head                   = list->tail;
     list->tail                        = prev;
-
-    
 
     listDUMP(list, __func__);
     ASSERT_OK(list);
@@ -338,6 +350,19 @@ int listPopFront(List *list, type_t *dest)
 
     memcpy(dest, &(list->array[list->head].value), sizeof(type_t));
     list->size --;
+
+    if (list->head == list->tail)
+    {
+        list->array[list->tail].prev = -1;
+        list->array[list->tail].next = list->free_head;
+        list->free_head              = list->head;
+        list->head                   = 0;
+        list->tail                   = 0;
+
+        listDUMP(list, __func__);
+        ASSERT_OK(list);
+        return 0;
+    }
     
     int next_elem                     = list->array[list->head].next;
     list->array[next_elem].prev       = 0;
@@ -736,7 +761,7 @@ int unitTest()
     {
         listPushBack(&list, i);
     }
-    for (int i = 9  ; i >= 1; i--)
+    for (int i = 9; i >= 1; i--)
     {
         type_t last = {};
         listPopBack(&list, &last);
